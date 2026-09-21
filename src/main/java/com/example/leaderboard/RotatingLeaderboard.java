@@ -17,6 +17,7 @@ import java.util.stream.Collectors;
 public class RotatingLeaderboard extends JavaPlugin implements Listener {
 
     private int currentBoardIndex = 0;
+    
     private final String[] boardTitles = {
             ChatColor.GOLD + "" + ChatColor.BOLD + "TOP KILLS",
             ChatColor.GREEN + "" + ChatColor.BOLD + "TOP TIME PLAYED",
@@ -33,7 +34,7 @@ public class RotatingLeaderboard extends JavaPlugin implements Listener {
             for (Player player : Bukkit.getOnlinePlayers()) {
                 updatePlayerScoreboard(player);
             }
-            // Increment and wrap cleanly (0 -> 1 -> 2 -> 3 -> 0 -> 1...)
+            // Rotate category index: 0 -> 1 -> 2 -> 3 -> 0 ...
             currentBoardIndex = (currentBoardIndex + 1) % boardTitles.length;
         }, 0L, 200L);
 
@@ -49,8 +50,21 @@ public class RotatingLeaderboard extends JavaPlugin implements Listener {
         ScoreboardManager manager = Bukkit.getScoreboardManager();
         if (manager == null) return;
 
-        Scoreboard board = manager.getNewScoreboard();
-        Objective objective = board.registerNewObjective("leaderboard", "dummy", boardTitles[currentBoardIndex]);
+        // Use player's active scoreboard or assign a new main scoreboard if default
+        Scoreboard board = player.getScoreboard();
+        if (board.equals(manager.getMainScoreboard())) {
+            board = manager.getNewScoreboard();
+            player.setScoreboard(board);
+        }
+
+        // Unregister existing sidebar objective to clean previous scores
+        Objective oldObjective = board.getObjective("sidebar_board");
+        if (oldObjective != null) {
+            oldObjective.unregister();
+        }
+
+        // Register fresh objective with the new rotating title
+        Objective objective = board.registerNewObjective("sidebar_board", "dummy", boardTitles[currentBoardIndex]);
         objective.setDisplaySlot(DisplaySlot.SIDEBAR);
 
         List<StatEntry> topPlayers = getTopPlayersForCategory(currentBoardIndex);
@@ -58,12 +72,16 @@ public class RotatingLeaderboard extends JavaPlugin implements Listener {
         int scoreIndex = topPlayers.size();
         for (StatEntry entry : topPlayers) {
             String lineText = ChatColor.YELLOW + entry.name + ChatColor.WHITE + ": " + ChatColor.GREEN + entry.formattedValue;
+            
+            // Limit line length to safe string length for older client compatibility
+            if (lineText.length() > 40) {
+                lineText = lineText.substring(0, 40);
+            }
+
             Score score = objective.getScore(lineText);
             score.setScore(scoreIndex);
             scoreIndex--;
         }
-
-        player.setScoreboard(board);
     }
 
     private List<StatEntry> getTopPlayersForCategory(int categoryIndex) {
