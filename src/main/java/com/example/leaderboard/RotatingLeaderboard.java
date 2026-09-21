@@ -28,8 +28,14 @@ public class RotatingLeaderboard extends JavaPlugin implements Listener {
     public void onEnable() {
         Bukkit.getPluginManager().registerEvents(this, this);
 
-        // Rotate scoreboard every 10 seconds (200 ticks)
-        Bukkit.getScheduler().runTaskTimer(this, this::updateAndRotateScoreboards, 0L, 200L);
+        // Run every 10 seconds (200 ticks) continuously
+        Bukkit.getScheduler().runTaskTimer(this, () -> {
+            for (Player player : Bukkit.getOnlinePlayers()) {
+                updatePlayerScoreboard(player);
+            }
+            // Increment and wrap cleanly (0 -> 1 -> 2 -> 3 -> 0 -> 1...)
+            currentBoardIndex = (currentBoardIndex + 1) % boardTitles.length;
+        }, 0L, 200L);
 
         getLogger().info("RotatingLeaderboard plugin enabled!");
     }
@@ -37,13 +43,6 @@ public class RotatingLeaderboard extends JavaPlugin implements Listener {
     @EventHandler
     public void onPlayerJoin(PlayerJoinEvent event) {
         updatePlayerScoreboard(event.getPlayer());
-    }
-
-    private void updateAndRotateScoreboards() {
-        for (Player player : Bukkit.getOnlinePlayers()) {
-            updatePlayerScoreboard(player);
-        }
-        currentBoardIndex = (currentBoardIndex + 1) % boardTitles.length;
     }
 
     private void updatePlayerScoreboard(Player player) {
@@ -100,7 +99,7 @@ public class RotatingLeaderboard extends JavaPlugin implements Listener {
                     break;
             }
 
-            if (value > 0) {
+            if (value >= 0) {
                 entries.add(new StatEntry(op.getName(), value, formattedValue));
             }
         }
