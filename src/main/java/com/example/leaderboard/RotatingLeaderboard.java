@@ -18,10 +18,10 @@ public class RotatingLeaderboard extends JavaPlugin implements Listener {
 
     private int currentBoardIndex = 0;
     
+    // Only 3 categories now (Blocks Destroyed removed)
     private final String[] boardTitles = {
             ChatColor.GOLD + "" + ChatColor.BOLD + "TOP KILLS",
             ChatColor.GREEN + "" + ChatColor.BOLD + "TOP TIME PLAYED",
-            ChatColor.AQUA + "" + ChatColor.BOLD + "BLOCKS DESTROYED",
             ChatColor.RED + "" + ChatColor.BOLD + "MOST DEATHS"
     };
 
@@ -34,11 +34,11 @@ public class RotatingLeaderboard extends JavaPlugin implements Listener {
             for (Player player : Bukkit.getOnlinePlayers()) {
                 updatePlayerScoreboard(player);
             }
-            // Rotate category index: 0 -> 1 -> 2 -> 3 -> 0 ...
+            // Continuous loop: 0 -> 1 -> 2 -> 0 -> 1 -> 2...
             currentBoardIndex = (currentBoardIndex + 1) % boardTitles.length;
         }, 0L, 200L);
 
-        getLogger().info("RotatingLeaderboard plugin enabled!");
+        getLogger().info("RotatingLeaderboard enabled with 3 rotating categories!");
     }
 
     @EventHandler
@@ -50,22 +50,26 @@ public class RotatingLeaderboard extends JavaPlugin implements Listener {
         ScoreboardManager manager = Bukkit.getScoreboardManager();
         if (manager == null) return;
 
-        // Use player's active scoreboard or assign a new main scoreboard if default
         Scoreboard board = player.getScoreboard();
         if (board.equals(manager.getMainScoreboard())) {
             board = manager.getNewScoreboard();
             player.setScoreboard(board);
         }
 
-        // Unregister existing sidebar objective to clean previous scores
-        Objective oldObjective = board.getObjective("sidebar_board");
-        if (oldObjective != null) {
-            oldObjective.unregister();
+        Objective objective = board.getObjective("rot_board");
+        
+        // Register objective if it doesn't exist yet
+        if (objective == null) {
+            objective = board.registerNewObjective("rot_board", "dummy", boardTitles[currentBoardIndex]);
+            objective.setDisplaySlot(DisplaySlot.SIDEBAR);
+        } else {
+            // Clear existing score entries before writing new ones
+            for (String entry : board.getEntries()) {
+                board.resetScores(entry);
+            }
+            // Update title to current category
+            objective.setDisplayName(boardTitles[currentBoardIndex]);
         }
-
-        // Register fresh objective with the new rotating title
-        Objective objective = board.registerNewObjective("sidebar_board", "dummy", boardTitles[currentBoardIndex]);
-        objective.setDisplaySlot(DisplaySlot.SIDEBAR);
 
         List<StatEntry> topPlayers = getTopPlayersForCategory(currentBoardIndex);
 
@@ -73,7 +77,6 @@ public class RotatingLeaderboard extends JavaPlugin implements Listener {
         for (StatEntry entry : topPlayers) {
             String lineText = ChatColor.YELLOW + entry.name + ChatColor.WHITE + ": " + ChatColor.GREEN + entry.formattedValue;
             
-            // Limit line length to safe string length for older client compatibility
             if (lineText.length() > 40) {
                 lineText = lineText.substring(0, 40);
             }
@@ -107,11 +110,7 @@ public class RotatingLeaderboard extends JavaPlugin implements Listener {
                     value = totalSeconds;
                     formattedValue = hours + "h " + minutes + "m";
                     break;
-                case 2: // Blocks Destroyed
-                    value = op.getStatistic(Statistic.MINE_BLOCK);
-                    formattedValue = String.valueOf(value);
-                    break;
-                case 3: // Most Deaths
+                case 2: // Most Deaths
                     value = op.getStatistic(Statistic.DEATHS);
                     formattedValue = String.valueOf(value);
                     break;
