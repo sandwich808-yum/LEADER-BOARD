@@ -1,0 +1,5 @@
+name: RotatingLeaderboard
+version: 1.0
+main: com.example.leaderboard.RotatingLeaderboard
+api-version: 1.16
+description: A sidebar scoreboard that automatically rotates top stats every 10 seconds.
